@@ -1,15 +1,31 @@
+import 'dotenv/config'
 import { createServer } from 'http';
 import express from 'express';
 import { Server } from "socket.io";
+import { ClerkExpressWithAuth, createClerkClient } from "@clerk/clerk-sdk-node";
+import cors from 'cors';
 
 const app = express();
 app.use(express.json());
 const server = createServer(app);
 
+app.use(cors({
+  origin: '*'
+}))
+
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:5173"
   }
+});
+const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
+const clerkClient = createClerkClient({ secretKey: CLERK_SECRET_KEY });
+
+app.use(ClerkExpressWithAuth());
+app.get("/secure", async (req, res) => {
+  const userId = req.auth.userId;
+  const u = await clerkClient.users.getUser(userId);
+  res.send(`Authenticated user ID: ${userId}`);
 });
 
 app.get('/', (req, res) => {
