@@ -1,6 +1,6 @@
 import { User } from './schema/User.js'
 import { createClerkClient } from "@clerk/clerk-sdk-node";
-import jwt from 'jsonwebtoken'
+import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET;
 const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
 const clerkClient = createClerkClient({ secretKey: CLERK_SECRET_KEY });

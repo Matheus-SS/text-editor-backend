@@ -1,9 +1,10 @@
 import 'dotenv/config'
-import { createServer } from 'http';
-import express from 'express';
-import { Server } from "socket.io";
-import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
 import cors from 'cors';
+import { createServer } from 'http';
+import { Server } from "socket.io";
+import express from 'express';
+import jwt from 'jsonwebtoken'
+import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
 import { Database } from './database.js';
 import { App } from './app.js'
 
@@ -11,10 +12,12 @@ const database = new Database();
 const appController = new App();
 
 const ROOM = 'ROOM';
+const JWT_SECRET = process.env.JWT_SECRET;
 const CLIENTS = {};
 
 const app = express();
 app.use(express.json());
+
 const server = createServer(app);
 
 app.use(cors({
@@ -31,9 +34,30 @@ app.use(ClerkExpressWithAuth());
 
 app.get("/secure", appController.secure);
 app.get('/', appController.index);
+app.get('/clients', (req, res) => {
+  console.log("CLIENTS", CLIENTS);
+
+  res.send("ok");
+});
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  console.log("token", token);
+  // if (!token) {
+  //   return next(new Error('Erro de autenticacao'))
+  // }
+
+  // jwt.verify(token, JWT_SECRET, (err, decoded) => {
+  //   console.log("decoded", decoded);
+  //   socket.userId = decoded.userId;
+  // });
+  next();
+});
 
 io.on("connection", (socket) => {
   console.log("conexao feita, ID: ", socket.id);
+
+  // CLIENTS[socket.userId] = socket.id;
 
   socket.join(ROOM);
 
