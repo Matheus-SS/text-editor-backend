@@ -43,27 +43,29 @@ app.get('/clients', (req, res) => {
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   console.log("token", token);
-  // if (!token) {
-  //   return next(new Error('Erro de autenticacao'))
-  // }
+  if (!token) {
+    return next(new Error('Erro de autenticacao'))
+  }
 
-  // jwt.verify(token, JWT_SECRET, (err, decoded) => {
-  //   console.log("decoded", decoded);
-  //   socket.userId = decoded.userId;
-  // });
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      next(new Error('Erro de autenticao'))
+    }
+    socket.userId = decoded.userId
+  });
   next();
 });
 
 io.on("connection", (socket) => {
   console.log("conexao feita, ID: ", socket.id);
 
-  // CLIENTS[socket.userId] = socket.id;
+  CLIENTS[socket.userId] = socket.id;
 
   socket.join(ROOM);
 
   socket.on('editor-change', (newContent) => {
     console.log("Mensagem enviada para o cliente: ", newContent);
-    socket.broadcast.emit('update-editor-change', newContent)
+    socket.to(ROOM).emit("update-editor-change", newContent);
   });
 
   socket.on('disconnect', () => {
