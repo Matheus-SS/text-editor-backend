@@ -3,7 +3,9 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from "socket.io";
 import express from 'express';
-import jwt from 'jsonwebtoken'
+import jwt from 'jsonwebtoken';
+import { DocumentModel } from './schema/Document.js';
+import { User } from './schema/User.js'
 import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
 import { Database } from './database.js';
 import { App } from './app.js'
@@ -67,6 +69,20 @@ io.on("connection", (socket) => {
     console.log("Mensagem enviada para o cliente: ", newContent);
     socket.to(ROOM).emit("update-editor-change", newContent);
   });
+
+  socket.on('client.document.save', async (content) => {
+    const user = await User.findById(socket.userId).exec();
+    const obj = JSON.parse(content);
+
+    console.log("user", user);
+    await DocumentModel.create({
+      text: obj.text,
+      title: obj.title,
+      authorId: socket.userId
+    });
+    console.log("content", content)
+
+  })
 
   socket.on('disconnect', () => {
     console.log("Cliente desconectado")
