@@ -73,7 +73,7 @@ io.on("connection", (socket) => {
   socket.on('client.document.save', async (content) => {
     const user = await User.findById(socket.userId).exec();
     const obj = JSON.parse(content);
-    console.log("user", user);
+
     await DocumentModel.create({
       text: obj.text,
       title: obj.title,
@@ -81,15 +81,21 @@ io.on("connection", (socket) => {
     });
     const doc = await DocumentModel.find({ authorId: socket.userId });
     console.log("content", content);
-    const d = { data: doc, success: true }
+    const d = { data: doc, success: true };
     socket.emit('server.document.list', d);
   });
 
   socket.on('server.document.list', async (callback) => {
     const doc = await DocumentModel.find({ authorId: socket.userId });
     console.log("content", doc);
-    callback({ success: true, data: doc })
+    callback({ success: true, data: doc });
   });
+
+  socket.on('server.document.open', async (_id, callback) => {
+    const doc = await DocumentModel.findOne({ _id });
+
+    callback({ success: true, data: doc })
+  })
 
   socket.on('disconnect', () => {
     console.log("Cliente desconectado")
