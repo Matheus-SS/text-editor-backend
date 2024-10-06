@@ -5,7 +5,6 @@ import { Server } from "socket.io";
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { DocumentModel } from './schema/Document.js';
-import { User } from './schema/User.js'
 import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
 import { Database } from './database.js';
 import { App } from './app.js'
@@ -16,6 +15,8 @@ const appController = new App();
 const ROOM = 'ROOM';
 const JWT_SECRET = process.env.JWT_SECRET;
 const CLIENTS = {};
+const errDocNotFound = 'Documento nao encontrado';
+const errInternalServer = 'Erro interno de servidor';
 
 const app = express();
 app.use(express.json());
@@ -71,30 +72,51 @@ io.on("connection", (socket) => {
   });
 
   socket.on('client.document.save', async (content) => {
-    const user = await User.findById(socket.userId).exec();
-    const obj = JSON.parse(content);
+    let filter = {};
+    if (content.docId) {
+      const doc = await DocumentModel.findOne({ _id: content.docId, authorId: socket.userId });
 
-    await DocumentModel.create({
-      text: obj.text,
-      title: obj.title,
+      if (!doc) {
+        const d = { data: errDocNotFound, success: false };
+        socket.emit('server.document.list', d);
+        return;
+      }
+      filter = { _id: content.docId, authorId: socket.userId };
+    }
+    
+    const saveOrUpdate = {
+      text: content.text,
+      title: content.title,
       authorId: socket.userId
+    };
+
+    await DocumentModel.findOneAndUpdate(filter, saveOrUpdate, {
+      upsert: true,
     });
-    const doc = await DocumentModel.find({ authorId: socket.userId });
-    console.log("content", content);
-    const d = { data: doc, success: true };
+    
+    const doc2 = await DocumentModel.find({ authorId: socket.userId });
+    const d = { data: doc2, success: true };
+    // envia para preencher a lista do menu
     socket.emit('server.document.list', d);
   });
 
   socket.on('server.document.list', async (callback) => {
     const doc = await DocumentModel.find({ authorId: socket.userId });
-    console.log("content", doc);
     callback({ success: true, data: doc });
   });
 
   socket.on('server.document.open', async (_id, callback) => {
-    const doc = await DocumentModel.findOne({ _id });
+    try {
+      const doc = await DocumentModel.findOne({ _id });
 
-    callback({ success: true, data: doc })
+      if (doc.authorId !== socket.userId) {
+        callback({ success: false, data: errDocNotFound });
+        return;
+      };
+      callback({ success: true, data: doc });
+    } catch (error) {
+      callback({ success: false, data: errInternalServer})
+    }
   })
 
   socket.on('disconnect', () => {
