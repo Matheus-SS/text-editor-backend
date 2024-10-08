@@ -17,6 +17,16 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const CLIENTS = {};
 const errDocNotFound = 'Documento nao encontrado';
 const errInternalServer = 'Erro interno de servidor';
+const errMaxAllowedDocuments = 'Número máximo de documentos atingido';
+
+
+function RESPONSE(data, success, err = '') {
+  if (success === false) {
+    return { error: err, message: data, success: false }
+  } else {
+    return { data: data, success: true }
+  }
+}
 
 const app = express();
 app.use(express.json());
@@ -72,30 +82,45 @@ io.on("connection", (socket) => {
   });
 
   socket.on('client.document.save', async (content) => {
-    let filter = {};
-    if (content.docId) {
-      const doc = await DocumentModel.findOne({ _id: content.docId, authorId: socket.userId });
-
-      if (!doc) {
-        const d = { data: errDocNotFound, success: false };
-        socket.emit('server.document.list', d);
-        return;
-      }
-      filter = { _id: content.docId, authorId: socket.userId };
+    const count = await DocumentModel.countDocuments({ authorId: socket.userId });
+    console.log("count", count);
+    if (count >= 5) {
+      const d = RESPONSE(errMaxAllowedDocuments, false, 'errMaxAllowedDocuments');
+      socket.emit('server.document.list', d);
+      return
     }
-    
+
     const saveOrUpdate = {
       text: content.text,
       title: content.title,
       authorId: socket.userId
     };
 
-    await DocumentModel.findOneAndUpdate(filter, saveOrUpdate, {
-      upsert: true,
-    });
-    
+    if (content.docId) {
+      const doc = await DocumentModel.findOne({ _id: content.docId, authorId: socket.userId });
+      console.log("doci")
+      if (!doc) {
+        const d = RESPONSE(errDocNotFound, false, 'errDocNotFound');
+        socket.emit('server.document.list', d);
+        return;
+      }
+
+      doc.text = saveOrUpdate.text;
+      doc.title = saveOrUpdate.title;
+      doc.authorId = saveOrUpdate.authorId;
+
+      await doc.save();
+      const doc2 = await DocumentModel.find({ authorId: socket.userId });
+
+      const d = RESPONSE(doc2, true);
+      socket.emit('server.document.list', d);
+      return
+    }
+
+    await DocumentModel.create(saveOrUpdate);
+
     const doc2 = await DocumentModel.find({ authorId: socket.userId });
-    const d = { data: doc2, success: true };
+    const d = RESPONSE(doc2, true);
     // envia para preencher a lista do menu
     socket.emit('server.document.list', d);
   });
@@ -115,7 +140,7 @@ io.on("connection", (socket) => {
       };
       callback({ success: true, data: doc });
     } catch (error) {
-      callback({ success: false, data: errInternalServer})
+      callback({ success: false, data: errInternalServer })
     }
   })
 
