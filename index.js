@@ -84,11 +84,6 @@ io.on("connection", (socket) => {
   socket.on('client.document.save', async (content) => {
     const count = await DocumentModel.countDocuments({ authorId: socket.userId });
     console.log("count", count);
-    if (count >= 5) {
-      const d = RESPONSE(errMaxAllowedDocuments, false, 'errMaxAllowedDocuments');
-      socket.emit('server.document.list', d);
-      return
-    }
 
     const saveOrUpdate = {
       text: content.text,
@@ -113,6 +108,12 @@ io.on("connection", (socket) => {
       const doc2 = await DocumentModel.find({ authorId: socket.userId });
 
       const d = RESPONSE(doc2, true);
+      socket.emit('server.document.list', d);
+      return
+    }
+
+    if (count >= 5) {
+      const d = RESPONSE(errMaxAllowedDocuments, false, 'errMaxAllowedDocuments');
       socket.emit('server.document.list', d);
       return
     }
