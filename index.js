@@ -126,6 +126,34 @@ io.on("connection", (socket) => {
     socket.emit('server.document.list', d);
   });
 
+  socket.on('client.document.update', async (content) => {
+    const update = {
+      text: content.text,
+      title: content.title,
+      authorId: socket.userId
+    };
+
+    if (content.docId) {
+      const doc = await DocumentModel.findOne({ _id: content.docId, authorId: socket.userId });
+      if (!doc) {
+        const d = RESPONSE(errDocNotFound, false, 'errDocNotFound');
+        socket.emit('server.document.update', d);
+        return;
+      }
+
+      doc.text = update.text;
+      doc.title = update.title;
+      doc.authorId = update.authorId;
+
+      await doc.save();
+      const doc2 = await DocumentModel.find({ authorId: socket.userId });
+
+      const d = RESPONSE(doc2, true);
+      socket.emit('server.document.update', d);
+      return
+    }
+  });
+
   socket.on('server.document.list', async (callback) => {
     const doc = await DocumentModel.find({ authorId: socket.userId });
     callback({ success: true, data: doc });
